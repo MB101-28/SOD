@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Superbike Rush 3D</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Segoe UI', Arial, sans-serif; }
+  #gameCanvas { display: block; width: 100%; height: 100%; }
+  
+  #hud {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; color: #fff;
+  }
+  
+  #speedometer {
+    position: absolute; bottom: 20px; right: 20px;
+    background: rgba(0,0,0,0.7); border: 2px solid #00e5ff;
+    border-radius: 50%; width: 120px; height: 120px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: bold;
+  }
+  #speedValue { font-size: 32px; color: #00e5ff; text-shadow: 0 0 10px #00e5ff; }
+  #speedLabel { font-size: 10px; color: #aaa; }
+  
+  #nitroBar {
+    position: absolute; bottom: 20px; left: 20px;
+    width: 200px; height: 20px;
+    background: rgba(0,0,0,0.7); border: 2px solid #ff6600;
+    border-radius: 10px; overflow: hidden;
+  }
+  #nitroFill {
+    height: 100%; width: 100%;
+    background: linear-gradient(90deg, #ff6600, #ffcc00);
+    transition: width 0.1s;
+  }
+  #nitroLabel {
+    position: absolute; bottom: 45px; left: 20px;
+    font-size: 12px; color: #ff6600; font-weight: bold;
+  }
+  
+  #scoreDisplay {
+    position: absolute; top: 20px; left: 20px;
+    font-size: 24px; font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+  }
+  #distanceDisplay {
+    position: absolute; top: 50px; left: 20px;
+    font-size: 16px; color: #aaa;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+  }
+  
+  #startScreen, #gameOverScreen {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.85); pointer-events: all; z-index: 10;
+  }
+  #startScreen h1, #gameOverScreen h1 {
+    font-size: 48px; color: #00e5ff; text-shadow: 0 0 20px #00e5ff;
+    margin-bottom: 20px; text-align: center;
+  }
+  #startScreen p, #gameOverScreen p {
+    font-size: 18px; color: #ccc; margin: 10px;
+  }
+  .btn {
+    margin-top: 20px; padding: 15px 40px;
+    font-size: 20px; font-weight: bold;
+    background: linear-gradient(135deg, #00e5ff, #0066ff);
+    color: #fff; border: none; border-radius: 30px;
+    cursor: pointer; pointer-events: all;
+    text-transform: uppercase; letter-spacing: 2px;
+    box-shadow: 0 0 20px rgba(0,229,255,0.5);
+    transition: transform 0.2s;
+  }
+  .btn:hover { transform: scale(1.1); }
+  #finalStats { font-size: 20px; color: #fff; margin: 10px; }
+  #finalStats span { color: #ffcc00; font-weight: bold; }
+  
+  #touchControls {
+    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+    display: none; pointer-events: all; z-index: 5;
+  }
+  .touchBtn {
+    width: 70px; height: 70px; margin: 5px;
+    background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.5);
+    border-radius: 50%; color: #fff; font-size: 24px; font-weight: bold;
+    display: inline-flex; align-items: center; justify-content: center;
+    user-select: none; -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+  .touchBtn:active { background: rgba(0,229,255,0.5); }
+  .touchRow { text-align: center; }
+  
+  @media (max-width: 768px) {
+    #touchControls { display: block; }
+    #speedometer { width: 90px; height: 90px; bottom: 100px; }
+    #speedValue { font-size: 24px; }
+    #nitroBar { width: 150px; bottom: 100px; }
+    #startScreen h1, #gameOverScreen h1 { font-size: 32px; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<div id="hud">
+  <div id="scoreDisplay">SCORE: 0</div>
+  <div id="distanceDisplay">DISTANCE: 0 m</div>
+  <div id="nitroLabel">NITRO</div>
+  <div id="nitroBar"><div id="nitroFill"></div></div>
+  <div id="speedometer">
+    <div id="speedValue">0</div>
+    <div id="speedLabel">km/h</div>
+  </div>
+</div>
+
+<div id="touchControls">
+  <div class="touchRow">
+    <div class="touchBtn" id="btnLeft">◀</div>
+    <div class="touchBtn" id="btnNitro" style="background:rgba(255,102,0,0.3);border-color:#ff6600;">N</div>
+    <div class="touchBtn" id="btnRight">▶</div>
+  </div>
+  <div class="touchRow">
+    <div class="touchBtn" id="btnGas" style="background:rgba(0,255,0,0.2);border-color:#0f0;">▲</div>
+    <div class="touchBtn" id="btnBrake" style="background:rgba(255,0,0,0.2);border-color:#f00;">▼</div>
+  </div>
+</div>
+
+<div id="startScreen">
+  <h1>🏍️ SUPERBIKE RUSH 3D</h1>
+  <p>Arrow Keys / WASD to steer & accelerate</p>
+  <p>SPACEBAR for Nitro Boost</p>
+  <p>Avoid obstacles, collect coins & nitro!</p>
+  <button class="btn" id="startBtn">START RACE</button>
+</div>
+
+<div id="gameOverScreen" style="display:none;">
+  <h1>💥 CRASHED!</h1>
+  <div id="finalStats">
+    <p>Final Score: <span id="finalScore">0</span></p>
+    <p>Distance: <span id="finalDistance">0</span> m</p>
+    <p>Top Speed: <span id="finalSpeed">0</span> km/h</p>
+  </div>
+  <button class="btn" id="restartBtn">RACE AGAIN</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  // ============ GAME CONFIG ============
+  const CONFIG = {
+    trackLength: 2000,
+    trackWidth: 14,
+    laneCount: 4,
+    maxSpeed: 280,
+    acceleration: 80,
+    braking: 120,
+    friction: 30,
+    steerSpeed: 8,
+    nitroBoost: 1.5,
+    nitroDuration: 3,
+    nitroRecharge: 0.3,
+    spawnDistance: 200,
+    despawnDistance: 30,
+    obstacleSpawnRate: 0.02,
+    powerupSpawnRate: 0.015,
+    scenerySpawnRate: 0.03
+  };
+
+  // ============ GLOBALS ============
+  let scene, camera, renderer;
+  let bike, bikeGroup;
+  let track, trackSegments = [];
+  let obstacles = [], powerups = [], scenery = [];
+  let particles = [];
+  
+  let gameState = 'start'; // start, playing, gameover
+  let speed = 0, maxSpeedReached = 0;
+  let distance = 0, score = 0;
+  let nitro = 100, nitroActive = false, nitroTimer = 0;
+  let bikeX = 0, bikeY = 0;
+  let targetBikeX = 0;
+  let time = 0, lastTime = 0;
+  let keys = {};
+  let touchKeys = {};
+  
+  // ============ INIT ============
+  function init() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87CEEB);
+    scene.fog = new THREE.Fog(0x87CEEB, 100, 400);
+    
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 4, 8);
+    
+    renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gameCanvas'), antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+    
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(50, 100, 50);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.camera.near = 0.5;
+    dirLight.shadow.camera.far = 500;
+    dirLight.shadow.camera.left = -100;
+    dirLight.shadow.camera.right = 100;
+    dirLight.shadow.camera.top = 100;
+    dirLight.shadow.camera.bottom = -100;
+    scene.add(dirLight);
+    
+    const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x3a7d3a, 0.4);
+    scene.add(hemiLight);
+    
+    buildTrack();
+    buildBike();
+    setupControls();
+    
+    window.addEventListener('resize', onResize);
+    lastTime = performance.now();
+    requestAnimationFrame(gameLoop);
+  }
+  
+  // ============ TRACK ============
+  function buildTrack() {
+    // Ground
+    const groundGeo = new THREE.PlaneGeometry(500, CONFIG.trackLength * 2);
+    const groundMat = new THREE.MeshLambertMaterial({ color: 0x3a7d3a });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.z = -CONFIG.trackLength / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+    
+    // Road
+    const roadGeo = new THREE.PlaneGeometry(CONFIG.trackWidth, CONFIG.trackLength * 2);
+    const roadMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
+    const road = new THREE.Mesh(roadGeo, roadMat);
+    road.rotation.x = -Math.PI / 2;
+    road.position.z = -CONFIG.trackLength / 2;
+    road.position.y = 0.01;
+    road.receiveShadow = true;
+    scene.add(road);
+    
+    // Lane markings
+    for (let i = 0; i < CONFIG.trackLength * 2; i += 4) {
+      const laneGeo = new THREE.PlaneGeometry(0.15, 2);
+      const laneMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      for (let lane = 1; lane < CONFIG.laneCount; lane++) {
+        const x = -CONFIG.trackWidth / 2 + (CONFIG.trackWidth / CONFIG.laneCount) * lane;
+        const laneMark = new THREE.Mesh(laneGeo, laneMat);
+        laneMark.rotation.x = -Math.PI / 2;
+        laneMark.position.set(x, 0.02, -i);
+        scene.add(laneMark);
+      }
+    }
+    
+    // Side barriers
+    const barrierGeo = new THREE.BoxGeometry(0.5, 1.2, CONFIG.trackLength * 2);
+    const barrierMat = new THREE.MeshLambertMaterial({ color: 0xcccccc });
+    const barrierLeft = new THREE.Mesh(barrierGeo, barrierMat);
+    barrierLeft.position.set(-CONFIG.trackWidth / 2 - 0.5, 0.6, -CONFIG.trackLength / 2);
+    barrierLeft.castShadow = true;
+    scene.add(barrierLeft);
+    
+    const barrierRight = new THREE.Mesh(barrierGeo, barrierMat);
+    barrierRight.position.set(CONFIG.trackWidth / 2 + 0.5, 0.6, -CONFIG.trackLength / 2);
+    barrierRight.castShadow = true;
+    scene.add(barrierRight);
+    
+    // Red/white stripes on barriers
+    const stripeGeo = new THREE.BoxGeometry(0.52, 0.3, 2);
+    const stripeMatRed = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+    const stripeMatWhite = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    for (let i = 0; i < CONFIG.trackLength * 2; i += 4) {
+      const mat = (Math.floor(i / 4) % 2 === 0) ? stripeMatRed : stripeMatWhite;
+      const stripeL = new THREE.Mesh(stripeGeo, mat);
+      stripeL.position.set(-CONFIG.trackWidth / 2 - 0.5, 0.6, -i);
+      scene.add(stripeL);
+      const stripeR = new THREE.Mesh(stripeGeo, mat);
+      stripeR.position.set(CONFIG.trackWidth / 2 + 0.5, 0.6, -i);
+      scene.add(stripeR);
+    }
+  }
+  
+  // ============ BIKE ============
+  function buildBike() {
+    bikeGroup = new THREE.Group();
+    
+    const bodyMat = new THREE.MeshPhongMaterial({ color: 0x1a1a2e, shininess: 100 });
+    const accentMat = new THREE.MeshPhongMaterial({ color: 0x0066ff, shininess: 100 });
+    const redMat = new THREE.MeshPhongMaterial({ color: 0xff2244, shininess: 100 });
+    const chromeMat = new THREE.MeshPhongMaterial({ color: 0xcccccc, shininess: 150 });
+    const blackMat = new THREE.MeshPhongMaterial({ color: 0x111111, shininess: 50 });
+    const glassMat = new THREE.MeshPhongMaterial({ color: 0x222244, shininess: 200, transparent: true, opacity: 0.7 });
+    
+    // Main body/fairing
+    const bodyGeo = new THREE.BoxGeometry(0.7, 0.5, 2.2);
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = 0.5;
+    body.castShadow = true;
+    bikeGroup.add(body);
+    
+    // Front fairing (nose)
+    const noseGeo = new THREE.BoxGeometry(0.6, 0.4, 0.8);
+    const nose = new THREE.Mesh(noseGeo, accentMat);
+    nose.position.set(0, 0.55, -1.3);
+    nose.castShadow = true;
+    bikeGroup.add(nose);
+    
+    // Side fairings
+    const sideGeo = new THREE.BoxGeometry(0.15, 0.4, 1.5);
+    const sideL = new THREE.Mesh(sideGeo, accentMat);
+    sideL.position.set(-0.4, 0.5, -0.2);
+    bikeGroup.add(sideL);
+    const sideR = new THREE.Mesh(sideGeo, accentMat);
+    sideR.position.set(0.4, 0.5, -0.2);
+    bikeGroup.add(sideR);
+    
+    // Red accent stripes
+    const stripeGeo = new THREE.BoxGeometry(0.05, 0.15, 1.8);
+    const stripeL = new THREE.Mesh(stripeGeo, redMat);
+    stripeL.position.set(-0.36, 0.6, -0.2);
+    bikeGroup.add(stripeL);
+    const stripeR = new THREE.Mesh(stripeGeo, redMat);
+    stripeR.position.set(0.36, 0.6, -0.2);
+    bikeGroup.add(stripeR);
+    
+    // Windshield
+    const windGeo = new THREE.BoxGeometry(0.5, 0.35, 0.3);
+    const wind = new THREE.Mesh(windGeo, glassMat);
+    wind.position.set(0, 0.85, -0.9);
+    wind.rotation.x = -0.3;
+    bikeGroup.add(wind);
+    
+    // Seat
+    const seatGeo = new THREE.BoxGeometry(0.5, 0.15, 0.8);
+    const seat = new THREE.Mesh(seatGeo, blackMat);
+    seat.position.set(0, 0.8, 0.3);
+    bikeGroup.add(seat);
+    
+    // Tail
+    const tailGeo = new THREE.BoxGeometry(0.4, 0.25, 0.6);
+    const tail = new THREE.Mesh(tailGeo, bodyMat);
+    tail.position.set(0, 0.65, 1.0);
+    bikeGroup.add(tail);
+    
+    // Handlebars
+    const handleGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.6, 8);
+    const handle = new THREE.Mesh(handleGeo, chromeMat);
+    handle.rotation.z = Math.PI / 2;
+    handle.position.set(0, 0.85, -0.7);
+    bikeGroup.add(handle);
+    
+    // Mirrors
+    const mirrorGeo = new THREE.BoxGeometry(0.12, 0.08, 0.08);
+    const mirrorL = new THREE.Mesh(mirrorGeo, blackMat);
+    mirrorL.position.set(-0.35, 0.95, -0.7);
+    bikeGroup.add(mirrorL);
+    const mirrorR = new THREE.Mesh(mirrorGeo, blackMat);
+    mirrorR.position.set(0.35, 0.95, -0.7);
+    bikeGroup.add(mirrorR);
+    
+    // Exhaust
+    const exhaustGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.8, 8);
+    const exhaust = new THREE.Mesh(exhaustGeo, chromeMat);
+    exhaust.rotation.x = Math.PI / 2;
+    exhaust.position.set(0.3, 0.35, 0.8);
+    bikeGroup.add(exhaust);
+    
+    // Wheels
+    const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.2, 16);
+    const wheelMat = new THREE.MeshPhongMaterial({ color: 0x111111, shininess: 30 });
+    const rimMat = new THREE.MeshPhongMaterial({ color: 0xffcc00, shininess: 100 });
+    
+    const frontWheel = new THREE.Mesh(wheelGeo, wheelMat);
+    frontWheel.rotation.z = Math.PI / 2;
+    frontWheel.position.set(0, 0.35, -1.1);
+    frontWheel.castShadow = true;
+    bikeGroup.add(frontWheel);
+    
+    // Front rim
+    const rimGeo = new THREE.TorusGeometry(0.25, 0.03, 8, 16);
+    const rimFront = new THREE.Mesh(rimGeo, rimMat);
+    rimFront.rotation.y = Math.PI / 2;
+    rimFront.position.set(-0.11, 0.35, -1.1);
+    bikeGroup.add(rimFront);
+    const rimFront2 = rimFront.clone();
+    rimFront2.position.x = 0.11;
+    bikeGroup.add(rimFront2);
+    
+    const rearWheel = new THREE.Mesh(wheelGeo, wheelMat);
+    rearWheel.rotation.z = Math.PI / 2;
+    rearWheel.position.set(0, 0.35, 1.1);
+    rearWheel.castShadow = true;
+    bikeGroup.add(rearWheel);
+    
+    const rimRear = new THREE.Mesh(rimGeo, rimMat);
+    rimRear.rotation.y = Math.PI / 2;
+    rimRear.position.set(-0.11, 0.35, 1.1);
+    bikeGroup.add(rimRear);
+    const rimRear2 = rimRear.clone();
+    rimRear2.position.x = 0.11;
+    bikeGroup.add(rimRear2);
+    
+    // Forks
+    const forkGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.7, 8);
+    const forkL = new THREE.Mesh(forkGeo, chromeMat);
+    forkL.position.set(-0.15, 0.5, -1.1);
+    bikeGroup.add(forkL);
+    const forkR = new THREE.Mesh(forkGeo, chromeMat);
+    forkR.position.set(0.15, 0.5, -1.1);
+    bikeGroup.add(forkR);
+    
+    // Headlight
+    const headlightGeo = new THREE.SphereGeometry(0.1, 8, 8);
+    const headlightMat = new THREE.MeshBasicMaterial({ color: 0xffffaa });
+    const headlight = new THREE.Mesh(headlightGeo, headlightMat);
+    headlight.position.set(0, 0.55, -1.7);
+    bikeGroup.add(headlight);
+    
+    // Rider (simplified)
+    const riderBody = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, 0.6, 0.4),
+      new THREE.MeshPhongMaterial({ color: 0x222222 })
+    );
+    riderBody.position.set(0, 1.1, 0.1);
+    riderBody.rotation.x = -0.3;
+    riderBody.castShadow = true;
+    bikeGroup.add(riderBody);
+    
+    // Rider helmet
+    const helmetGeo = new THREE.SphereGeometry(0.2, 12, 12);
+    const helmet = new THREE.Mesh(helmetGeo, new THREE.MeshPhongMaterial({ color: 0x111111, shininess: 100 }));
+    helmet.position.set(0, 1.45, -0.1);
+    helmet.castShadow = true;
+    bikeGroup.add(helmet);
+    
+    // Helmet visor
+    const visorGeo = new THREE.BoxGeometry(0.25, 0.1, 0.05);
+    const visor = new THREE.Mesh(visorGeo, new THREE.MeshPhongMaterial({ color: 0x333366, shininess: 200 }));
+    visor.position.set(0, 1.42, -0.28);
+    bikeGroup.add(visor);
+    
+    // Rider arms
+    const armGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.5, 8);
+    const armMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
+    const armL = new THREE.Mesh(armGeo, armMat);
+    armL.position.set(-0.3, 1.0, -0.5);
+    armL.rotation.x = -0.8;
+    armL.rotation.z = 0.3;
+    bikeGroup.add(armL);
+    const armR = new THREE.Mesh(armGeo, armMat);
+    armR.position.set(0.3, 1.0, -0.5);
+    armR.rotation.x = -0.8;
+    armR.rotation.z = -0.3;
+    bikeGroup.add(armR);
+    
+    // Number plate
+    const numGeo = new THREE.BoxGeometry(0.3, 0.2, 0.05);
+    const numMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const num = new THREE.Mesh(numGeo, numMat);
+    num.position.set(0, 0.7, -1.65);
+    bikeGroup.add(num);
+    
+    bikeGroup.position.set(0, 0, 0);
+    scene.add(bikeGroup);
+    bike = bikeGroup;
+  }
+  
+  // ============ SCENERY ============
+  function createTree(x, z) {
+    const group = new THREE.Group();
+    const trunkGeo = new THREE.CylinderGeometry(0.15, 0.2, 1.5, 8);
+    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x4a2f1a });
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.y = 0.75;
+    trunk.castShadow = true;
+    group.add(trunk);
+    
+    const leavesGeo = new THREE.ConeGeometry(0.8, 2, 8);
+    const leavesMat = new THREE.MeshLambertMaterial({ color: 0x2d5a1e });
+    const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+    leaves.position.y = 2;
+    leaves.castShadow = true;
+    group.add(leaves);
+    
+    group.position.set(x, 0, z);
+    return group;
+  }
+  
+  function createStreetlight(x, z) {
+    const group = new THREE.Group();
+    const poleGeo = new THREE.CylinderGeometry(0.05, 0.08, 4, 8);
+    const poleMat = new THREE.MeshLambertMaterial({ color: 0x888888 });
+    const pole = new THREE.Mesh(poleGeo, poleMat);
+    pole.position.y = 2;
+    group.add(pole);
+    
+    const armGeo = new THREE.BoxGeometry(1, 0.05, 0.05);
+    const arm = new THREE.Mesh(armGeo, poleMat);
+    arm.position.set(0.5, 3.9, 0);
+    group.add(arm);
+    
+    const lightGeo = new THREE.BoxGeometry(0.3, 0.1, 0.2);
+    const lightMat = new THREE.MeshBasicMaterial({ color: 0xffffcc });
+    const light = new THREE.Mesh(lightGeo, lightMat);
+    light.position.set(1, 3.85, 0);
+    group.add(light);
+    
+    group.position.set(x, 0, z);
+    return group;
+  }
+  
+  function createBuilding(x, z) {
+    const group = new THREE.Group();
+    const h = 3 + Math.random() * 5;
+    const w = 2 + Math.random() * 3;
+    const d = 2 + Math.random() * 3;
+    const colors = [0x666666, 0x888888, 0x555555, 0x777777, 0x444466];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const buildGeo = new THREE.BoxGeometry(w, h, d);
+    const buildMat = new THREE.MeshLambertMaterial({ color: color });
+    const build = new THREE.Mesh(buildGeo, buildMat);
+    build.position.y = h / 2;
+    build.castShadow = true;
+    group.add(build);
+    
+    // Windows
+    const winGeo = new THREE.PlaneGeometry(0.3, 0.4);
+    const winMat = new THREE.MeshBasicMaterial({ color: 0xffff88 });
+    for (let wy = 1; wy < h - 0.5; wy += 1) {
+      for (let wx = -w/2 + 0.5; wx < w/2 - 0.3; wx += 0.8) {
+        if (Math.random() > 0.3) {
+          const win = new THREE.Mesh(winGeo, winMat);
+          win.position.set(wx, wy, d/2 + 0.01);
+          group.add(win);
+        }
+      }
+    }
+    
+    group.position.set(x, 0, z);
+    return group;
+  }
+  
+  // ============ OBSTACLES ============
+  function createCar(x, z) {
+    const group = new THREE.Group();
+    const colors = [0xff3333, 0x3333ff, 0x33cc33, 0xffcc00, 0xffffff, 0x333333];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    
+    const bodyGeo = new THREE.BoxGeometry(1.8, 0.8, 3.5);
+    const bodyMat = new THREE.MeshPhongMaterial({ color: color, shininess: 80 });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = 0.6;
+    body.castShadow = true;
+    group.add(body);
+    
+    const cabinGeo = new THREE.BoxGeometry(1.6, 0.7, 1.8);
+    const cabinMat = new THREE.MeshPhongMaterial({ color: 0x222244, shininess: 100, transparent: true, opacity: 0.7 });
+    const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+    cabin.position.set(0, 1.2, -0.2);
+    group.add(cabin);
+    
+    // Wheels
+    const wheelGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.2, 12);
+    const wheelMat = new THREE.MeshPhongMaterial({ color: 0x111111 });
+    const positions = [[-0.9, 0.3, -1.2], [0.9, 0.3, -1.2], [-0.9, 0.3, 1.2], [0.9, 0.3, 1.2]];
+    positions.forEach(p => {
+      const w = new THREE.Mesh(wheelGeo, wheelMat);
+      w.rotation.z = Math.PI / 2;
+      w.position.set(...p);
+      group.add(w);
+    });
+    
+    group.position.set(x, 0, z);
+    group.userData = { type: 'car', width: 1.8, height: 1.5, depth: 3.5 };
+    return group;
+  }
+  
+  function createCone(x, z) {
+    const group = new THREE.Group();
+    const coneGeo = new THREE.ConeGeometry(0.3, 0.8, 8);
+    const coneMat = new THREE.MeshPhongMaterial({ color: 0xff6600 });
+    const cone = new THREE.Mesh(coneGeo, coneMat);
+    cone.position.y = 0.4;
+    cone.castShadow = true;
+    group.add(cone);
+    
+    const baseGeo = new THREE.BoxGeometry(0.5, 0.1, 0.5);
+    const baseMat = new THREE.MeshPhongMaterial({ color: 0xff6600 });
+    const base = new THREE.Mesh(baseGeo, baseMat);
+    base.position.y = 0.05;
+    group.add(base);
+    
+    // White stripe
+    const stripeGeo = new THREE.CylinderGeometry(0.25, 0.28, 0.15, 8);
+    const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+    stripe.position.y = 0.5;
+    group.add(stripe);
+    
+    group.position.set(x, 0, z);
+    group.userData = { type: 'cone', width: 0.6, height: 0.8, depth: 0.6 };
+    return group;
+  }
+  
+  function createOilSlick(x, z) {
+    const geo = new THREE.CircleGeometry(0.8, 16);
+    const mat = new THREE.MeshPhongMaterial({ color: 0x111111, shininess: 200, transparent: true, opacity: 0.8 });
+    const oil = new THREE.Mesh(geo, mat);
+    oil.rotation.x = -Math.PI / 2;
+    oil.position.set(x, 0.02, z);
+    oil.userData = { type: 'oil', width: 1.6, height: 0.1, depth: 1.6 };
+    return oil;
+  }
+  
+  // ============ POWERUPS ============
+  function createNitroCanister(x, z) {
+    const group = new THREE.Group();
+    const bodyGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.6, 12);
+    const bodyMat = new THREE.MeshPhongMaterial({ color: 0xff6600, emissive: 0xff3300, emissiveIntensity: 0.5 });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = 0.5;
+    group.add(body);
+    
+    const topGeo = new THREE.CylinderGeometry(0.15, 0.25, 0.15, 12);
+    const topMat = new THREE.MeshPhongMaterial({ color: 0xcc4400 });
+    const top = new THREE.Mesh(topGeo, topMat);
+    top.position.y = 0.85;
+    group.add(top);
+    
+    // Glow
+    const glowGeo = new THREE.SphereGeometry(0.5, 8, 8);
+    const glowMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.3 });
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    glow.position.y = 0.5;
+    group.add(glow);
+    
+    group.position.set(x, 0, z);
+    group.userData = { type: 'nitro', width: 0.8, height: 1, depth: 0.8 };
+    return group;
+  }
+  
+  function createCoin(x, z) {
+    const group = new THREE.Group();
+    const coinGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.08, 16);
+    const coinMat = new THREE.MeshPhongMaterial({ color: 0xffcc00, emissive: 0xffaa00, emissiveIntensity: 0.3, shininess: 200 });
+    const coin = new THREE.Mesh(coinGeo, coinMat);
+    coin.rotation.x = Math.PI / 2;
+    coin.position.y = 1;
+    group.add(coin);
+    
+    const glowGeo = new THREE.SphereGeometry(0.5, 8, 8);
+    const glowMat = new THREE.MeshBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 0.2 });
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    glow.position.y = 1;
+    group.add(glow);
+    
+    group.position.set(x, 0, z);
+    group.userData = { type: 'coin', width: 0.6, height: 1.2, depth: 0.6 };
+    return group;
+  }
+  
+  // ============ PARTICLES ============
+  function createExhaustParticle() {
+    const geo = new THREE.SphereGeometry(0.08, 6, 6);
+    const mat = new THREE.MeshBasicMaterial({ 
+      color: nitroActive ? 0xff6600 : 0x888888, 
+      transparent: true, 
+      opacity: 0.7 
+    });
+    const p = new THREE.Mesh(geo, mat);
+    p.position.set(
+      bikeGroup.position.x + (Math.random() - 0.5) * 0.2,
+      0.35 + Math.random() * 0.1,
+      bikeGroup.position.z + 1.2
+    );
+    p.userData = { life: 1, vy: 0.02 + Math.random() * 0.02, vx: (Math.random() - 0.5) * 0.02 };
+    scene.add(p);
+    particles.push(p);
+  }
+  
+  function createNitroParticle() {
+    const geo = new THREE.SphereGeometry(0.12, 6, 6);
+    const colors = [0xff6600, 0xffcc00, 0xff3300];
+    const mat = new THREE.MeshBasicMaterial({ 
+      color: colors[Math.floor(Math.random() * colors.length)], 
+      transparent: true, 
+      opacity: 0.8 
+    });
+    const p = new THREE.Mesh(geo, mat);
+    p.position.set(
+      bikeGroup.position.x + (Math.random() - 0.5) * 0.3,
+      0.3 + Math.random() * 0.2,
+      bikeGroup.position.z + 1.3
+    );
+    p.userData = { life: 1, vy: 0.03 + Math.random() * 0.03, vx: (Math.random() - 0.5) * 0.03 };
+    scene.add(p);
+    particles.push(p);
+  }
+  
+  // ============ CONTROLS ============
+  function setupControls() {
+    document.addEventListener('keydown', (e) => {
+      keys[e.code] = true;
+      if (e.code === 'Space') e.preventDefault();
+    });
+    document.addEventListener('keyup', (e) => {
+      keys[e.code] = false;
+    });
+    
+    // Touch controls
+    const setupTouch = (id, key) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('touchstart', (e) => { e.preventDefault(); touchKeys[key] = true; });
+      el.addEventListener('touchend', (e) => { e.preventDefault(); touchKeys[key] = false; });
+      el.addEventListener('mousedown', (e) => { touchKeys[key] = true; });
+      el.addEventListener('mouseup', (e) => { touchKeys[key] = false; });
+    };
+    setupTouch('btnLeft', 'ArrowLeft');
+    setupTouch('btnRight', 'ArrowRight');
+    setupTouch('btnGas', 'ArrowUp');
+    setupTouch('btnBrake', 'ArrowDown');
+    setupTouch('btnNitro', 'Space');
+    
+    document.getElementById('startBtn').addEventListener('click', startGame);
+    document.getElementById('restartBtn').addEventListener('click', restartGame);
+    
+    // Tap to start
+    document.getElementById('startScreen').addEventListener('click', (e) => {
+      if (e.target.id !== 'startBtn') startGame();
+    });
+  }
+  
+  function isKey(code) {
+    return keys[code] || touchKeys[code];
+  }
+  
+  // ============ GAME STATES ============
+  function startGame() {
+    document.getElementById('startScreen').style.display = 'none';
+    document.getElementById('gameOverScreen').style.display = 'none';
+    gameState = 'playing';
+    speed = 0;
+    distance = 0;
+    score = 0;
+    nitro = 100;
+    nitroActive = false;
+    nitroTimer = 0;
+    bikeX = 0;
+    targetBikeX = 0;
+    maxSpeedReached = 0;
+    
+    // Clear obstacles and powerups
+    obstacles.forEach(o => scene.remove(o));
+    powerups.forEach(p => scene.remove(p));
+    scenery.forEach(s => scene.remove(s));
+    particles.forEach(p => scene.remove(p));
+    obstacles = [];
+    powerups = [];
+    scenery = [];
+    particles = [];
+    
+    bikeGroup.position.set(0, 0, 0);
+    bikeGroup.rotation.set(0, 0, 0);
+  }
+  
+  function restartGame() {
+    startGame();
+  }
+  
+  function gameOver() {
+    gameState = 'gameover';
+    document.getElementById('gameOverScreen').style.display = 'flex';
+    document.getElementById('finalScore').textContent = Math.floor(score);
+    document.getElementById('finalDistance').textContent = Math.floor(distance);
+    document.getElementById('finalSpeed').textContent = Math.floor(maxSpeedReached);
+  }
+  
+  // ============ SPAWNING ============
+  function spawnObstacle() {
+    const z = bikeGroup.position.z - CONFIG.spawnDistance;
+    const lanes = [-4, -1.5, 1.5, 4];
+    const x = lanes[Math.floor(Math.random() * lanes.length)] + (Math.random() - 0.5) * 1;
+    const types = ['car', 'car', 'cone', 'cone', 'oil'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    
+    let obj;
+    if (type === 'car') obj = createCar(x, z);
+    else if (type === 'cone') obj = createCone(x, z);
+    else obj = createOilSlick(x, z);
+    
+    scene.add(obj);
+    obstacles.push(obj);
+  }
+  
+  function spawnPowerup() {
+    const z = bikeGroup.position.z - CONFIG.spawnDistance;
+    const lanes = [-4, -1.5, 1.5, 4];
+    const x = lanes[Math.floor(Math.random() * lanes.length)];
+    const type = Math.random() > 0.5 ? 'nitro' : 'coin';
+    
+    let obj;
+    if (type === 'nitro') obj = createNitroCanister(x, z);
+    else obj = createCoin(x, z);
+    
+    scene.add(obj);
+    powerups.push(obj);
+  }
+  
+  function spawnScenery() {
+    const z = bikeGroup.position.z - CONFIG.spawnDistance;
+    const side = Math.random() > 0.5 ? 1 : -1;
+    const x = side * (CONFIG.trackWidth / 2 + 3 + Math.random() * 15);
+    
+    const r = Math.random();
+    let obj;
+    if (r < 0.5) obj = createTree(x, z);
+    else if (r < 0.8) obj = createStreetlight(x, z);
+    else obj = createBuilding(x, z);
+    
+    scene.add(obj);
+    scenery.push(obj);
+  }
+  
+  // ============ COLLISION ============
+  function checkCollision(a, b) {
+    const ax = a.position.x, az = a.position.z;
+    const bx = b.position.x, bz = b.position.z;
+    const aw = (a.userData.width || 0.7) / 2;
+    const ad = (a.userData.depth || 2.2) / 2;
+    const bw = (b.userData.width || 0.7) / 2;
+    const bd = (b.userData.depth || 2.2) / 2;
+    
+    return Math.abs(ax - bx) < (aw + bw) && Math.abs(az - bz) < (ad + bd);
+  }
+  
+  // ============ UPDATE ============
+  function update(dt) {
+    if (gameState !== 'playing') return;
+    
+    time += dt;
+    
+    // Input
+    const left = isKey('ArrowLeft') || isKey('KeyA');
+    const right = isKey('ArrowRight') || isKey('KeyD');
+    const up = isKey('ArrowUp') || isKey('KeyW');
+    const down = isKey('ArrowDown') || isKey('KeyS');
+    const nitroKey = isKey('Space');
+    
+    // Nitro
+    if (nitroKey && nitro > 0 && !nitroActive) {
+      nitroActive = true;
+      nitroTimer = CONFIG.nitroDuration;
+    }
+    
+    if (nitroActive) {
+      nitroTimer -= dt;
+      nitro -= dt * 30;
+      if (nitroTimer <= 0 || nitro <= 0) {
+        nitroActive = false;
+        nitro = Math.max(0, nitro);
+      }
+    } else {
+      nitro = Math.min(100, nitro + CONFIG.nitroRecharge * dt * 10);
+    }
+    
+    // Speed
+    const currentMax = nitroActive ? CONFIG.maxSpeed * CONFIG.nitroBoost : CONFIG.maxSpeed;
+    if (up) {
+      speed += CONFIG.acceleration * dt;
+    } else if (down) {
+      speed -= CONFIG.braking * dt;
+    } else {
+      speed -= CONFIG.friction * dt;
+    }
+    speed = Math.max(0, Math.min(speed, currentMax));
+    if (speed > maxSpeedReached) maxSpeedReached = speed;
+    
+    // Steering
+    const steerAmount = CONFIG.steerSpeed * dt * (speed / CONFIG.maxSpeed + 0.3);
+    if (left) targetBikeX -= steerAmount;
+    if (right) targetBikeX += steerAmount;
+    targetBikeX = Math.max(-CONFIG.trackWidth / 2 + 1, Math.min(CONFIG.trackWidth / 2 - 1, targetBikeX));
+    bikeX += (targetBikeX - bikeX) * 5 * dt;
+    
+    // Move bike forward
+    const moveDist = speed * dt * 0.5;
+    bikeGroup.position.z -= moveDist;
+    bikeGroup.position.x = bikeX;
+    distance += moveDist;
+    score += moveDist * 0.1 + (nitroActive ? moveDist * 0.2 : 0);
+    
+    // Bike tilt
+    const targetTilt = (targetBikeX - bikeX) * 0.3;
+    bikeGroup.rotation.z += (targetTilt - bikeGroup.rotation.z) * 5 * dt;
+    bikeGroup.rotation.y = (targetBikeX - bikeX) * 0.1;
+    
+    // Camera
+    const camTargetX = bikeX * 0.5;
+    const camTargetY = 3.5 + (nitroActive ? 1 : 0);
+    const camTargetZ = bikeGroup.position.z + 7 + (nitroActive ? 2 : 0);
+    camera.position.x += (camTargetX - camera.position.x) * 3 * dt;
+    camera.position.y += (camTargetY - camera.position.y) * 3 * dt;
+    camera.position.z += (camTargetZ - camera.position.z) * 3 * dt;
+    camera.lookAt(bikeX * 0.3, 1, bikeGroup.position.z - 10);
+    
+    // FOV shift on nitro
+    const targetFOV = nitroActive ? 85 : 70;
+    camera.fov += (targetFOV - camera.fov) * 3 * dt;
+    camera.updateProjectionMatrix();
+    
+    // Spawn
+    if (Math.random() < CONFIG.obstacleSpawnRate * (1 + speed / CONFIG.maxSpeed)) spawnObstacle();
+    if (Math.random() < CONFIG.powerupSpawnRate) spawnPowerup();
+    if (Math.random() < CONFIG.scenerySpawnRate) spawnScenery();
+    
+    // Update obstacles
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+      const o = obstacles[i];
+      if (o.position.z > bikeGroup.position.z + CONFIG.despawnDistance) {
+        scene.remove(o);
+        obstacles.splice(i, 1);
+        continue;
+      }
+      if (checkCollision(bikeGroup, o)) {
+        if (o.userData.type === 'oil') {
+          // Spin out
+          speed *= 0.5;
+          targetBikeX += (Math.random() - 0.5) * 3;
+        } else {
+          gameOver();
+          return;
+        }
+      }
+    }
+    
+    // Update powerups
+    for (let i = powerups.length - 1; i >= 0; i--) {
+      const p = powerups[i];
+      if (p.position.z > bikeGroup.position.z + CONFIG.despawnDistance) {
+        scene.remove(p);
+        powerups.splice(i, 1);
+        continue;
+      }
+      // Animate
+      p.rotation.y += dt * 2;
+      if (p.userData.type === 'coin') {
+        p.position.y = Math.sin(time * 3) * 0.2 + 0.5;
+      }
+      if (checkCollision(bikeGroup, p)) {
+        if (p.userData.type === 'nitro') {
+          nitro = Math.min(100, nitro + 30);
+          score += 50;
+        } else {
+          score += 100;
+        }
+        scene.remove(p);
+        powerups.splice(i, 1);
+      }
+    }
+    
+    // Update scenery
+    for (let i = scenery.length - 1; i >= 0; i--) {
+      const s = scenery[i];
+      if (s.position.z > bikeGroup.position.z + CONFIG.despawnDistance) {
+        scene.remove(s);
+        scenery.splice(i, 1);
+      }
+    }
+    
+    // Particles
+    if (speed > 50) {
+      if (nitroActive) createNitroParticle();
+      else if (Math.random() < 0.3) createExhaustParticle();
+    }
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.userData.life -= dt * 2;
+      p.position.y += p.userData.vy;
+      p.position.x += p.userData.vx;
+      p.material.opacity = p.userData.life * 0.7;
+      p.scale.multiplyScalar(0.98);
+      if (p.userData.life <= 0) {
+        scene.remove(p);
+        particles.splice(i, 1);
+      }
+    }
+    
+    // Track boundary check
+    if (Math.abs(bikeX) > CONFIG.trackWidth / 2 - 0.5) {
+      speed *= 0.95;
+      if (Math.abs(bikeX) > CONFIG.trackWidth / 2 + 0.5) {
+        gameOver();
+        return;
+      }
+    }
+    
+    // Update HUD
+    document.getElementById('speedValue').textContent = Math.floor(speed);
+    document.getElementById('scoreDisplay').textContent = 'SCORE: ' + Math.floor(score);
+    document.getElementById('distanceDisplay').textContent = 'DISTANCE: ' + Math.floor(distance) + ' m';
+    document.getElementById('nitroFill').style.width = nitro + '%';
+    if (nitroActive) {
+      document.getElementById('nitroFill').style.background = 'linear-gradient(90deg, #ff3300, #ff6600, #ffcc00)';
+    } else {
+      document.getElementById('nitroFill').style.background = 'linear-gradient(90deg, #ff6600, #ffcc00)';
+    }
+  }
+  
+  // ============ GAME LOOP ============
+  function gameLoop(timestamp) {
+    const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+    lastTime = timestamp;
+    
+    update(dt);
+    renderer.render(scene, camera);
+    requestAnimationFrame(gameLoop);
+  }
+  
+  function onResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+  
+  // Start
+  init();
+})();
+</script>
+</body>
+</html>
